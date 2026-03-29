@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using server.Date;
 using server.Models;
+using server.Service;
 
 namespace server.Controllers;
 
@@ -16,11 +17,13 @@ public class AuthController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly PasswordHasher<User> _hasher;
+    private readonly TokenService _tokenService;
 
     public AuthController(AppDbContext db, PasswordHasher<User> hasher)
     {
         _db = db;
         _hasher = hasher;
+        _tokenService = new TokenService();
     }
 
     [HttpPost("register")]
@@ -44,8 +47,10 @@ public class AuthController : ControllerBase
 
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
+        user.Id = await _db.Users.Where(x => x.Email == user.Email)
+            .Select(x => x.Id).FirstOrDefaultAsync();
 
-        return Ok(new { user.Id, user.Email, user.Username });
+        return await IssueTokens(user);
     }
 
     [HttpPost("login")]
@@ -60,6 +65,60 @@ public class AuthController : ControllerBase
         if (ok == PasswordVerificationResult.Failed)
             return Unauthorized("Invalid email or password.");
 
-        return Ok(new { message = "Logged in", user.Id, user.Email, user.Username });
+        return await IssueTokens(user);
+    }
+
+    private async Task<IActionResult> IssueTokens(User user)
+    {
+        var session = new Session
+        {
+            UserId = user.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _db.Session.Add(session);
+        await _db.SaveChangesAsync(); 
+
+        var refreshToken = new RefreshToken
+        {
+            SessionId = session.Id,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            IsRevoked = false
+        };
+
+        _db.RefreshToken.Add(refreshToken);
+        await _db.SaveChangesAsync();
+
+        await _db.SaveChangesAsync();
+
+        var accessToken = _tokenService.GenerateAccessToken(user.Id.ToString());
+
+        var refreshJwt = _tokenService.GenerateRefreshToken(
+            user.Id.ToString(),
+            refreshToken.Id.ToString()
+        );
+
+        Response.Cookies.Append("access_token", accessToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTime.UtcNow.AddMinutes(15)
+        });
+
+        Response.Cookies.Append("refresh_token", refreshJwt, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTime.UtcNow.AddDays(7)
+        });
+
+        return Ok(new
+        {
+            user.Id,
+            user.Email,
+            user.Username
+        });
     }
 }

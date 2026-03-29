@@ -1,4 +1,3 @@
-using System.Text;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -6,14 +5,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using server.Date;
 using server.Models;
+using server.Service;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
-Env.Load(".env");
+Env.Load(Path.Combine(Directory.GetCurrentDirectory(), ".env"));
 
 var connStr = Environment.GetEnvironmentVariable("PG_CONNECTION")
               ?? throw new Exception("PG_CONNECTION not set in .env or environment");
+
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connStr));
 builder.Services.AddScoped<PasswordHasher<User>>();
 
@@ -58,8 +60,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseAuthentication();
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
