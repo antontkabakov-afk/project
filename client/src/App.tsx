@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MacbookScroll } from "@/components/ui/macbook-scroll";
 import icon from "../public/icon.png";
-import TextFlippingBoardDemo from './components/text-flipping-board-demo';
- 
-function App() {
 
+import FloatingDockDemo from "./components/floating-dock-demo" 
+
+function App() {
   return (
-    <div className="w-full overflow-hidden bg-white dark:bg-[#0B0B0F]">
-      <TextFlippingBoardDemo/>
+    <div>
+      <FloatingDockDemo/>
+      <div className="w-full overflow-hidden bg-white dark:bg-[#0B0B0F]">
+
       <MacbookScroll
         title={
           ""
@@ -18,6 +20,7 @@ function App() {
         src={`/linear.webp`}
         showGradient={false}
       />
+    </div>
     </div>
     )
 }
