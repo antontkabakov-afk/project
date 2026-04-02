@@ -71,13 +71,13 @@ export default function FloatingDockComponent() {
   ];
   return (
     <div className="flex flex-row items-center justify-center gap-4 bg-[#0B0B0F] h-[10rem] w-full">
-  <FloatingDock items={links} desktopClassName="mx-0" />
-  
-  <GooeyInput 
-    placeholder="Search for projects..." 
-    collapsedWidth={48} // Perfectly round (matches height)
-    expandedWidth={220} 
-  />
-</div>
+      <FloatingDock items={links} desktopClassName="mx-0" />
+      
+      <GooeyInput 
+        placeholder="Search for projects..." 
+        collapsedWidth={48} 
+        expandedWidth={220} 
+      />
+    </div>
   );
 }
