@@ -25,26 +25,26 @@ public class AppDbContext : DbContext
             e.Property(x => x.Email).HasMaxLength(255).IsRequired();
             e.Property(x => x.PasswordHash).HasMaxLength(255).IsRequired();
             e.Property(x => x.Username).HasMaxLength(50);
+
+            e.HasMany(x => x.Sessions)
+                .WithOne(x => x.User)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Session>(e =>
         {
             e.HasKey(x => x.Id);
 
-            e.HasOne(x => x.User)
-                .WithMany()
-                .HasForeignKey(x => x.UserId)
+            e.HasMany(x => x.RefreshTokens)
+                .WithOne(x => x.Session)
+                .HasForeignKey(x => x.SessionId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<RefreshToken>(e =>
         {
             e.HasKey(x => x.Id);
-
-            e.HasOne(x => x.Session)
-                .WithMany()
-                .HasForeignKey(x => x.SessionId)
-                .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(x => x.SessionId);
         });

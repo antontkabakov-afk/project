@@ -1,13 +1,14 @@
-﻿using server.Date;
-
+﻿
 namespace server.Models;
 
 public class RefreshToken
 {
-    public int Id { get; set; } 
+    public int Id { get; set; }
 
     public int SessionId { get; set; }
     public Session Session { get; set; }
+
+    public string Token { get; set; } = null!;
 
     public DateTime ExpiresAt { get; set; }
 

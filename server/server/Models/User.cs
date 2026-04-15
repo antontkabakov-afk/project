@@ -6,12 +6,10 @@ public class User
 
     public string Email { get; set; } = null!;
     public string PasswordHash { get; set; } = null!;
-
     public string Username { get; set; } = string.Empty;
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime LastSeenUtc { get; set; }
 
-    public DateTime LastSeanUtc { get; set; } = default;
-
-    public ICollection<RefreshToken> Servers { get; set; } = new List<RefreshToken>();
+    public ICollection<Session> Sessions { get; set; } = new List<Session>();
 }
