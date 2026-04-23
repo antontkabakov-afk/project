@@ -1,6 +1,7 @@
 # Backend (.NET)
 bin/
 obj/
+.dotnet/
 *.user
 *.suo
 *.log
