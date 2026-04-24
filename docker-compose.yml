@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-crypto_tracker}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-crypto_tracker}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: ./server/server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      PG_CONNECTION: Host=db;Port=5432;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required};Database=${POSTGRES_DB:-crypto_tracker}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      CLIENT_ORIGINS: ${CLIENT_ORIGINS:-http://localhost:8080,http://localhost:5173,http://localhost:4173}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-Lax}
+      AUTH_COOKIE_DOMAIN: ${AUTH_COOKIE_DOMAIN:-}
+      COINGECKO_BASE_URL: ${COINGECKO_BASE_URL:-https://api.coingecko.com/api/v3/}
+      COINGECKO_DEMO_API_KEY: ${COINGECKO_DEMO_API_KEY:-}
+      COINGECKO_SUPPORTED_COINS: ${COINGECKO_SUPPORTED_COINS:-bitcoin,ethereum,solana,ripple,cardano,dogecoin,tron,avalanche-2,polkadot,chainlink}
+      MORALIS_BASE_URL: ${MORALIS_BASE_URL:-https://deep-index.moralis.io/api/v2.2/}
+      MORALIS_API_KEY: ${MORALIS_API_KEY:-}
+      MORALIS_DEFAULT_CHAIN: ${MORALIS_DEFAULT_CHAIN:-eth}
+      MORALIS_SUPPORTED_CHAINS: ${MORALIS_SUPPORTED_CHAINS:-eth,polygon,base,arbitrum,optimism,bsc,avalanche}
+      CRYPTO_PRICE_SNAPSHOT_INTERVAL_MINUTES: ${CRYPTO_PRICE_SNAPSHOT_INTERVAL_MINUTES:-15}
+      CRYPTO_PRICE_BACKFILL_DAYS: ${CRYPTO_PRICE_BACKFILL_DAYS:-30}
+      PORTFOLIO_SNAPSHOT_INTERVAL_MINUTES: ${PORTFOLIO_SNAPSHOT_INTERVAL_MINUTES:-60}
+    ports:
+      - "${API_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:8080/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: http://api:8080
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+volumes:
+  postgres_data:
