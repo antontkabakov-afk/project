@@ -62,26 +62,35 @@ public class WalletService : IWalletService
 
         var normalizedAddress = _moralisService.NormalizeWalletAddress(walletAddress);
         var normalizedChain = _moralisService.NormalizeChain(chain);
+        WalletSnapshotView? snapshot = null;
+        var strategy = _db.Database.CreateExecutionStrategy();
 
-        user.WalletAddress = normalizedAddress;
-        user.WalletChain = normalizedChain;
-        user.WalletConnectedAtUtc = DateTime.UtcNow;
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
-        await _db.SaveChangesAsync(cancellationToken);
+            user.WalletAddress = normalizedAddress;
+            user.WalletChain = normalizedChain;
+            user.WalletConnectedAtUtc = DateTime.UtcNow;
 
-        var snapshot = await _portfolioSnapshotService.CreateSnapshotAsync(
-            userId,
-            normalizedAddress,
-            normalizedChain,
-            force: true,
-            cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            snapshot = await _portfolioSnapshotService.CreateSnapshotAsync(
+                userId,
+                normalizedAddress,
+                normalizedChain,
+                force: true,
+                cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+        });
 
         return new WalletConnectionView(
             true,
             normalizedAddress,
             normalizedChain,
             user.WalletConnectedAtUtc,
-            snapshot.Timestamp,
-            snapshot.TotalValueUsd);
+            snapshot?.Timestamp,
+            snapshot?.TotalValueUsd);
     }
 }

@@ -272,11 +272,18 @@ public class PriceService : IPriceService
         IReadOnlyList<AssetPlatformItem> assetPlatforms,
         out TokenPriceQuote quote)
     {
-        quote = default!;
-
         var cacheKey = GetCacheKey(token, assetPlatforms);
-        return !string.IsNullOrWhiteSpace(cacheKey)
-            && _memoryCache.TryGetValue(cacheKey, out quote);
+
+        if (!string.IsNullOrWhiteSpace(cacheKey) &&
+            _memoryCache.TryGetValue<TokenPriceQuote>(cacheKey, out var cachedQuote) &&
+            cachedQuote is not null)
+        {
+            quote = cachedQuote;
+            return true;
+        }
+
+        quote = default!;
+        return false;
     }
 
     private void CacheQuote(

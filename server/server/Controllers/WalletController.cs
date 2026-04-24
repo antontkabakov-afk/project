@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using server.Extensions;
 using server.Service;
+using System.ComponentModel.DataAnnotations;
 
 namespace server.Controllers;
 
-public record ConnectWalletRequest(string WalletAddress, string? Chain);
+public record ConnectWalletRequest(
+    [Required, MaxLength(100)] string WalletAddress,
+    string? Chain);
 
 [ApiController]
 [Authorize]

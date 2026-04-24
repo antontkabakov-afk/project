@@ -4,10 +4,14 @@
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "JWT_ACCESS_SECRET": "MySuperSecretKey_2026_Viktor_!@#_VeryLong123",
-        "COINGECKO_DEMO_API_KEY": "CG-uVgZd63tdt7488Jbs1V5NMTS",
+        "JWT_ACCESS_SECRET": "development-jwt-secret-change-me-1234567890",
         "COINGECKO_BASE_URL": "https://api.coingecko.com/api/v3/",
-        "MORALIS_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjRiNjhjOWQwLWY2NWQtNDAzZC1hOWViLWMxMDM4YWU0ZDI2YyIsIm9yZ0lkIjoiNTExNTg5IiwidXNlcklkIjoiNTI2NDEzIiwidHlwZUlkIjoiMDFiYWRhMzItMzgwMC00YTEyLTk5ZTUtZDkxMDlkMjAxMTc0IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzY3NTg5NzMsImV4cCI6NDkzMjUxODk3M30.rdFQpY-9yPG_AGfP5a7odYG9TEBLw-LSoWpbM5KmBxk"
+        "COINGECKO_DEMO_API_KEY": "",
+        "MORALIS_API_KEY": "",
+        "PG_CONNECTION": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=crypto_tracker",
+        "CLIENT_ORIGINS": "http://localhost:5173,http://localhost:4173,http://localhost:8080",
+        "AUTH_COOKIE_SECURE": "false",
+        "AUTH_COOKIE_SAME_SITE": "Lax"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "http://localhost:5247"
@@ -16,10 +20,14 @@
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "JWT_ACCESS_SECRET": "MySuperSecretKey_2026_Viktor_!@#_VeryLong123",
-        "COINGECKO_DEMO_API_KEY": "CG-uVgZd63tdt7488Jbs1V5NMTS",
+        "JWT_ACCESS_SECRET": "development-jwt-secret-change-me-1234567890",
         "COINGECKO_BASE_URL": "https://api.coingecko.com/api/v3/",
-        "MORALIS_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjRiNjhjOWQwLWY2NWQtNDAzZC1hOWViLWMxMDM4YWU0ZDI2YyIsIm9yZ0lkIjoiNTExNTg5IiwidXNlcklkIjoiNTI2NDEzIiwidHlwZUlkIjoiMDFiYWRhMzItMzgwMC00YTEyLTk5ZTUtZDkxMDlkMjAxMTc0IiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NzY3NTg5NzMsImV4cCI6NDkzMjUxODk3M30.rdFQpY-9yPG_AGfP5a7odYG9TEBLw-LSoWpbM5KmBxk"
+        "COINGECKO_DEMO_API_KEY": "",
+        "MORALIS_API_KEY": "",
+        "PG_CONNECTION": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=crypto_tracker",
+        "CLIENT_ORIGINS": "https://localhost:7269,http://localhost:5173,http://localhost:4173,http://localhost:8080",
+        "AUTH_COOKIE_SECURE": "true",
+        "AUTH_COOKIE_SAME_SITE": "Lax"
       },
       "dotnetRunMessages": true,
       "applicationUrl": "https://localhost:7269;http://localhost:5247"
