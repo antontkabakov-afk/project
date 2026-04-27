@@ -6,6 +6,7 @@ using server.Models;
 using server.Service;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
+using server.Service.Setting;
 
 namespace server.Controllers;
 
@@ -296,8 +297,9 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             isSuccess = true,
-            user.Email,
-            user.Username
+            id = user.Id,
+            email = user.Email,
+            username = user.Username
         });
     }
 

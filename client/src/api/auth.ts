@@ -2,6 +2,7 @@ import { ApiError, apiRequest } from "./client";
 
 export interface AuthResponse {
   isSuccess: boolean;
+  id: number;
   email: string;
   username: string;
 }

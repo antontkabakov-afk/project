@@ -200,8 +200,8 @@ export default function Assets() {
                   : "No stored price history exists for this asset yet."}
               </div>
             ) : (
-              <div className="mt-8 h-[320px]">
-                <ResponsiveContainer height="100%" width="100%">
+              <div className="mt-8 h-[320px] min-w-0">
+                <ResponsiveContainer height="100%" minWidth={0} width="100%">
                   <AreaChart data={visiblePriceHistory}>
                     <defs>
                       <linearGradient id="assetPriceHistoryFill" x1="0" x2="0" y1="0" y2="1">

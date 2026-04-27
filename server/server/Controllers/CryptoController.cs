@@ -66,6 +66,10 @@ public class CryptoController : ControllerBase
         {
             return BadRequest(ex.Message);
         }
+        catch (ExternalServiceException ex)
+        {
+            return ToErrorResponse(ex);
+        }
     }
 
     private IActionResult ToErrorResponse(ExternalServiceException exception)
