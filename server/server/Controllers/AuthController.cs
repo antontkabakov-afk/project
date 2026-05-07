@@ -6,6 +6,7 @@ using server.Models;
 using server.Service;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
+using server.Service.Setting;
 
 namespace server.Controllers;
 
@@ -131,8 +132,6 @@ public class AuthController : ControllerBase
                 return;
             }
 
-            await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
-
             var user = new User
             {
                 Email = email,
@@ -158,7 +157,6 @@ public class AuthController : ControllerBase
             await _db.SaveChangesAsync(cancellationToken);
 
             result = await IssueTokens(user, session, null, cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
         });
 
         return result ?? throw new InvalidOperationException("Registration did not produce a response.");
@@ -296,8 +294,9 @@ public class AuthController : ControllerBase
         return Ok(new
         {
             isSuccess = true,
-            user.Email,
-            user.Username
+            id = user.Id,
+            email = user.Email,
+            username = user.Username
         });
     }
 

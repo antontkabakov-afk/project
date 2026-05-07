@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { refresh } from "@/api/auth";
 import { getApiErrorMessage } from "@/api/client";
 import DashboardCard from "@/components/dashboard-card";
 import DashboardPageHeader from "@/components/dashboard-page-header";
@@ -21,6 +22,7 @@ import {
   type AssetPerformance,
   type PortfolioStatistics,
 } from "@/api/portfolio";
+import { getUser, type UserView } from "@/api/wallets";
 import { formatAmount, formatCurrency, formatPercent } from "@/lib/formatters";
 
 const chartColors = [
@@ -35,12 +37,18 @@ const chartColors = [
 ];
 
 export default function Statistics() {
+  const [user, setUser] = useState<UserView | null>(null);
   const [statistics, setStatistics] = useState<PortfolioStatistics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [range, setRange] = useState<TimeRangeOption>("30d");
+  const [selectedWalletScope, setSelectedWalletScope] = useState("all");
 
   const selectedRangeDays = range === "30d" ? 30 : undefined;
+  const selectedWalletId =
+    selectedWalletScope === "all" ? undefined : Number(selectedWalletScope);
+  const selectedWallet =
+    user?.wallets.find((wallet) => wallet.id === selectedWalletId) ?? null;
   const performance = statistics?.performance;
 
   useEffect(() => {
@@ -51,7 +59,60 @@ export default function Statistics() {
       setErrorMessage("");
 
       try {
-        const result = await getPortfolioStatistics(selectedRangeDays);
+        const session = await refresh();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!session?.isSuccess) {
+          setUser(null);
+          setStatistics(null);
+          setErrorMessage("Your session has expired. Please log in again.");
+          return;
+        }
+
+        const nextUser = await getUser(session.id);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setUser(nextUser);
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(getApiErrorMessage(error));
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!user) {
+      setStatistics(null);
+      return;
+    }
+
+    const run = async () => {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      try {
+        const result = await getPortfolioStatistics(selectedRangeDays, selectedWalletId);
 
         if (!isMounted) {
           return;
@@ -76,14 +137,14 @@ export default function Statistics() {
     return () => {
       isMounted = false;
     };
-  }, [selectedRangeDays]);
+  }, [selectedRangeDays, selectedWalletId, user]);
 
   return (
     <div className="mx-auto max-w-7xl px-6">
       <DashboardPageHeader
         eyebrow="Statistics"
-        title="Performance, allocation, and leaders with a 30-day default lens"
-        description="The dashboard now emphasizes the most recent month first, so the performance curve and movers feel current instead of diluted by the full archive."
+        title="Compare the full account or one wallet at a time"
+        description="Switch between all wallets and an individual chain-specific wallet, then inspect stored performance, distribution, and movers for the selected window."
       />
 
       {isLoading ? (
@@ -93,6 +154,10 @@ export default function Statistics() {
       ) : errorMessage ? (
         <DashboardCard>
           <p className="text-sm text-rose-300">{errorMessage}</p>
+        </DashboardCard>
+      ) : !user || user.wallets.length === 0 ? (
+        <DashboardCard>
+          <p className="text-white/70">Add a wallet and capture snapshots to unlock statistics.</p>
         </DashboardCard>
       ) : !statistics || !performance ? (
         <DashboardCard>
@@ -105,12 +170,32 @@ export default function Statistics() {
               <div>
                 <h2 className="text-lg font-semibold text-white">Statistics window</h2>
                 <p className="mt-2 max-w-2xl text-sm text-white/60">
-                  Compare the last 30 days by default or expand the view to the full
-                  stored portfolio history whenever you need the longer trend.
+                  Scope the data to the entire account or a single wallet. The 30-day view
+                  stays the default lens for faster recent comparisons.
                 </p>
               </div>
 
-              <TimeRangeToggle onChange={setRange} value={range} />
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="block text-sm text-white/65">
+                  <span className="text-xs uppercase tracking-[0.3em] text-white/45">
+                    Scope
+                  </span>
+                  <select
+                    className="mt-2 min-w-[240px] rounded-2xl border border-white/10 bg-[#020617]/80 px-4 py-3 text-white outline-none transition focus:border-[#00F5C8]"
+                    onChange={(event) => setSelectedWalletScope(event.target.value)}
+                    value={selectedWalletScope}
+                  >
+                    <option value="all">All wallets</option>
+                    {user.wallets.map((wallet) => (
+                      <option key={wallet.id} value={String(wallet.id)}>
+                        {wallet.name} · {wallet.chain}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <TimeRangeToggle onChange={setRange} value={range} />
+              </div>
             </div>
           </DashboardCard>
 
@@ -119,20 +204,20 @@ export default function Statistics() {
               label={range === "30d" ? "30-day change" : "Change since first snapshot"}
               tone={performance.changeValueUsd}
               value={formatCurrency(performance.changeValueUsd)}
-              secondary={formatPercent(performance.changePercentage)}
+              secondary={selectedWallet ? selectedWallet.name : "All wallets"}
             />
             <MetricCard
               label="Current value"
               tone={performance.currentValueUsd}
               value={formatCurrency(performance.currentValueUsd)}
-              secondary="Latest snapshot in range"
+              secondary={selectedWallet ? `${selectedWallet.name} · ${selectedWallet.chain}` : "Latest account snapshot"}
             />
             <MetricCard
               label="Starting value"
               tone={performance.startingValueUsd}
               value={formatCurrency(performance.startingValueUsd)}
               secondary={
-                range === "30d" ? "Oldest snapshot in the last 30 days" : "First stored snapshot"
+                range === "30d" ? "Oldest visible point in range" : "First stored snapshot"
               }
             />
           </div>
@@ -140,9 +225,11 @@ export default function Statistics() {
           <DashboardCard>
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-white">Portfolio history</h2>
+                <h2 className="text-lg font-semibold text-white">
+                  {selectedWallet ? `${selectedWallet.name} history` : "Portfolio history"}
+                </h2>
                 <p className="mt-2 text-sm text-white/60">
-                  Every point is loaded from an immutable database snapshot.
+                  The chart uses stored wallet snapshots and aggregates them into the selected scope.
                 </p>
               </div>
               <div className="text-right text-sm text-white/60">
@@ -168,8 +255,8 @@ export default function Statistics() {
                   : "Capture snapshots to populate the historical performance chart."}
               </p>
             ) : (
-              <div className="mt-8 h-[320px]">
-                <ResponsiveContainer height="100%" width="100%">
+              <div className="mt-8 h-[320px] min-w-0">
+                <ResponsiveContainer height="100%" minWidth={0} width="100%">
                   <AreaChart data={statistics.history}>
                     <defs>
                       <linearGradient id="portfolioHistoryFill" x1="0" x2="0" y1="0" y2="1">
@@ -220,7 +307,7 @@ export default function Statistics() {
               <div>
                 <h2 className="text-lg font-semibold text-white">Asset distribution</h2>
                 <p className="mt-2 text-sm text-white/60">
-                  Allocation is based on the latest snapshot inside the selected window.
+                  Allocation comes from the latest snapshot inside the selected scope and time window.
                 </p>
 
                 {statistics.distribution.length === 0 ? (
@@ -228,8 +315,8 @@ export default function Statistics() {
                     No active holdings are available in the latest snapshot.
                   </p>
                 ) : (
-                  <div className="mt-8 h-[280px]">
-                    <ResponsiveContainer height="100%" width="100%">
+                  <div className="mt-8 h-[280px] min-w-0">
+                    <ResponsiveContainer height="100%" minWidth={0} width="100%">
                       <PieChart>
                         <Pie
                           data={statistics.distribution}
@@ -242,7 +329,7 @@ export default function Statistics() {
                           {statistics.distribution.map((asset, index) => (
                             <Cell
                               fill={chartColors[index % chartColors.length]}
-                              key={asset.assetSymbol}
+                              key={`${asset.assetSymbol}-${index}`}
                             />
                           ))}
                         </Pie>
@@ -263,7 +350,7 @@ export default function Statistics() {
                 {statistics.distribution.map((asset, index) => (
                   <div
                     className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
-                    key={asset.assetSymbol}
+                    key={`${asset.assetSymbol}-${index}`}
                   >
                     <div className="flex items-center gap-3">
                       <span

@@ -23,20 +23,6 @@ export interface WalletSnapshot {
   assets: WalletAssetSnapshot[];
 }
 
-export interface WalletConnection {
-  isConnected: boolean;
-  walletAddress: string | null;
-  chain: string;
-  connectedAtUtc: string | null;
-  lastSnapshotAtUtc: string | null;
-  lastSnapshotValueUsd: number | null;
-}
-
-export interface ConnectWalletRequest {
-  walletAddress: string;
-  chain: string;
-}
-
 export interface PortfolioPerformanceSummary {
   startTimestampUtc: string | null;
   endTimestampUtc: string | null;
@@ -78,27 +64,8 @@ export interface PortfolioStatistics {
   worstAsset: AssetPerformance | null;
 }
 
-export async function getWalletConnection(): Promise<WalletConnection> {
-  return apiRequest<WalletConnection>("/wallet");
-}
-
-export async function connectWallet(
-  request: ConnectWalletRequest,
-): Promise<WalletConnection> {
-  return apiRequest<WalletConnection>("/wallet", {
-    method: "PUT",
-    body: JSON.stringify(request),
-  });
-}
-
-export async function createSnapshot(): Promise<WalletSnapshot> {
-  return apiRequest<WalletSnapshot>("/wallet/snapshot", {
-    method: "POST",
-  });
-}
-
-export async function getAssets(): Promise<WalletAssetSnapshot[]> {
-  return apiRequest<WalletAssetSnapshot[]>("/portfolio/assets");
+export async function getAssets(walletId?: number): Promise<WalletAssetSnapshot[]> {
+  return apiRequest<WalletAssetSnapshot[]>(`/portfolio/assets${buildQuery(undefined, walletId)}`);
 }
 
 export async function getSnapshotHistory(): Promise<WalletSnapshot[]> {
@@ -107,16 +74,29 @@ export async function getSnapshotHistory(): Promise<WalletSnapshot[]> {
 
 export async function getSnapshotHistoryForRange(
   days?: number,
+  walletId?: number,
 ): Promise<WalletSnapshot[]> {
-  return apiRequest<WalletSnapshot[]>(`/portfolio/history${buildRangeQuery(days)}`);
+  return apiRequest<WalletSnapshot[]>(`/portfolio/history${buildQuery(days, walletId)}`);
 }
 
 export async function getPortfolioStatistics(
   days?: number,
+  walletId?: number,
 ): Promise<PortfolioStatistics> {
-  return apiRequest<PortfolioStatistics>(`/portfolio/statistics${buildRangeQuery(days)}`);
+  return apiRequest<PortfolioStatistics>(`/portfolio/statistics${buildQuery(days, walletId)}`);
 }
 
-function buildRangeQuery(days?: number): string {
-  return days ? `?days=${days}` : "";
+function buildQuery(days?: number, walletId?: number): string {
+  const params = new URLSearchParams();
+
+  if (days) {
+    params.set("days", String(days));
+  }
+
+  if (walletId) {
+    params.set("walletId", String(walletId));
+  }
+
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }

@@ -8,6 +8,12 @@ using Scalar.AspNetCore;
 using server.Date;
 using server.Models;
 using server.Service;
+using server.Service.Crypto;
+using server.Service.DummyAccount;
+using server.Service.Portfolio;
+using server.Service.Setting;
+using server.Service.User;
+using server.Service.Wallet;
 using System.Net;
 using System.Text;
 
@@ -16,9 +22,8 @@ var builder = WebApplication.CreateBuilder(args);
 var connStr = DBContextStting.FromEnvironment();
 var jwtSettings = JwtSettings.FromEnvironment();
 var coinGeckoSettings = CoinGeckoSettings.FromEnvironment();
-var moralisSettings = MoralisSettings.FromEnvironment();
-var portfolioSnapshotSettings = PortfolioSnapshotSettings.FromEnvironment();
 var cryptoPriceSnapshotSettings = CryptoPriceSnapshotSettings.FromEnvironment();
+var moralisSettings = MoralisSettings.FromEnvironment();
 var authCookieSettings = AuthCookieSettings.FromEnvironment(builder.Environment);
 var corsSettings = CorsSettings.FromEnvironment();
 
@@ -45,11 +50,11 @@ builder.Services.AddMemoryCache();
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton(coinGeckoSettings);
-builder.Services.AddSingleton(moralisSettings);
-builder.Services.AddSingleton(portfolioSnapshotSettings);
 builder.Services.AddSingleton(cryptoPriceSnapshotSettings);
+builder.Services.AddSingleton(moralisSettings);
 builder.Services.AddSingleton(authCookieSettings);
 builder.Services.AddSingleton(corsSettings);
+builder.Services.AddSingleton(connStr);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
@@ -104,21 +109,26 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddScoped<ICryptoPriceSnapshotService, CryptoPriceSnapshotService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
+builder.Services.AddScoped<IWalletSnapshotService, WalletSnapshotService>();
 builder.Services.AddScoped<IPortfolioSnapshotService, PortfolioSnapshotService>();
+builder.Services.AddScoped<DummyAccountService>();
+
 builder.Services.AddHttpClient<ICryptoService, CryptoService>(ConfigureCoinGeckoHttpClient);
+builder.Services.AddHttpClient<IPriceService, PriceService>(ConfigureCoinGeckoHttpClient);
 builder.Services.AddHttpClient<IMoralisService, MoralisService>(client =>
 {
     client.BaseAddress = new Uri(moralisSettings.BaseUrl);
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("crypto-tracker/1.0");
 
     if (!string.IsNullOrWhiteSpace(moralisSettings.ApiKey))
     {
         client.DefaultRequestHeaders.Add("X-API-Key", moralisSettings.ApiKey);
     }
 });
-builder.Services.AddHttpClient<IPriceService, PriceService>(ConfigureCoinGeckoHttpClient);
 builder.Services.AddHostedService<CryptoPriceSnapshotBackgroundService>();
-builder.Services.AddHostedService<PortfolioSnapshotBackgroundService>();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddAuthorization();
@@ -129,6 +139,16 @@ var startupLogger = app.Services
     .CreateLogger("Startup");
 
 await MigrateDatabaseAsync(app.Services, startupLogger);
+
+using (var scope = app.Services.CreateScope())
+{
+    var conn = scope.ServiceProvider.GetRequiredService<DBContextStting>();
+
+    if (conn.IsDummyInfo)
+    {
+        scope.ServiceProvider.GetRequiredService<DummyAccountService>();
+    }
+}
 
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
@@ -177,8 +197,7 @@ static async Task MigrateDatabaseAsync(IServiceProvider services, ILogger logger
             using var scope = services.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            await dbContext.Database.MigrateAsync();
-            logger.LogInformation("Database migrations applied successfully.");
+            await InitializeDatabaseAsync(dbContext, logger);
             return;
         }
         catch (Exception ex) when (attempt < maxAttempts && IsTransientStartupFailure(ex))
@@ -198,11 +217,64 @@ static async Task MigrateDatabaseAsync(IServiceProvider services, ILogger logger
 
     using var finalScope = services.CreateScope();
     var finalDbContext = finalScope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await finalDbContext.Database.MigrateAsync();
+    await InitializeDatabaseAsync(finalDbContext, logger);
+}
+
+static async Task InitializeDatabaseAsync(AppDbContext dbContext, ILogger logger)
+{
+    var hasMigrations = dbContext.Database.GetMigrations();
+
+    if (!hasMigrations.Any())
+    {
+        await dbContext.Database.EnsureCreatedAsync();
+        logger.LogInformation("No EF Core migrations were found. Database schema was created with EnsureCreated.");
+    }
+    else
+    {
+        await dbContext.Database.MigrateAsync();
+        logger.LogInformation("Database migrations applied successfully.");
+    }
+
+    await ApplySchemaUpgradesAsync(dbContext, logger);
 }
 
 static bool IsTransientStartupFailure(Exception exception)
 {
     return exception is NpgsqlException or TimeoutException ||
         exception.InnerException is not null && IsTransientStartupFailure(exception.InnerException);
+}
+
+static async Task ApplySchemaUpgradesAsync(AppDbContext dbContext, ILogger logger)
+{
+    await dbContext.Database.ExecuteSqlRawAsync(
+        """
+        ALTER TABLE "Wallets"
+            ADD COLUMN IF NOT EXISTS "Chain" character varying(32) NOT NULL DEFAULT 'eth';
+
+        ALTER TABLE "WalletSnapshots"
+            ADD COLUMN IF NOT EXISTS "AssetsJson" text NOT NULL DEFAULT '[]';
+
+        ALTER TABLE "Wallets"
+            ALTER COLUMN "Chain" SET DEFAULT 'eth';
+
+        ALTER TABLE "WalletSnapshots"
+            ALTER COLUMN "AssetsJson" SET DEFAULT '[]';
+
+        DROP INDEX IF EXISTS "IX_Wallets_UserId_Address";
+        DROP INDEX IF EXISTS "IX_Wallets_UserId_Address_Chain";
+
+        CREATE UNIQUE INDEX "IX_Wallets_UserId_Address_Chain"
+            ON "Wallets" ("UserId", "Address", "Chain");
+
+        CREATE INDEX IF NOT EXISTS "IX_Wallets_UserId"
+            ON "Wallets" ("UserId");
+
+        CREATE INDEX IF NOT EXISTS "IX_WalletSnapshots_WalletId"
+            ON "WalletSnapshots" ("WalletId");
+
+        CREATE INDEX IF NOT EXISTS "IX_WalletSnapshots_WalletId_Timestamp"
+            ON "WalletSnapshots" ("WalletId", "Timestamp");
+        """);
+
+    logger.LogInformation("Wallet schema upgrades were applied successfully.");
 }

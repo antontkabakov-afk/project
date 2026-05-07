@@ -7,6 +7,9 @@ export default defineConfig(({ mode }) => {
   const devProxyTarget = env.VITE_DEV_PROXY_TARGET || "http://localhost:5247";
 
   return {
+    build: {
+      assetsDir: "static",
+    },
     plugins: [react()],
     preview: {
       host: "0.0.0.0",
